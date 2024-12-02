@@ -1,0 +1,100 @@
+version: '3.8'
+
+services:
+  essence_backend:
+    image: essence_backend:dev
+    build:
+      context: ./backend
+      dockerfile: docker/Dockerfile
+    container_name: essence_backend
+    ports:
+      - "${BACKEND_PORT}:8090/tcp"
+    networks:
+      - essence_network
+
+  essence_parser:
+    image: essence_parser:dev
+    build:
+      context: ./smart-parser
+      dockerfile: docker/Dockerfile
+    container_name: essence_parser
+    ports:
+      - "${PARSER_PORT}:8091/tcp"
+    networks:
+      - essence_network
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: essence_db
+    restart: always
+    environment:
+      POSTGRES_USER: "${DB_USER}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD}"
+      POSTGRES_DB: "${DB_NAME}"
+    ports:
+      - "${DB_PORT}:5432"
+    volumes:
+      - essence_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+    networks:
+      - essence_network
+
+  elasticsearch:
+    image: elasticsearch:7.17.4
+    container_name: elasticsearch
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    environment:
+      ES_JAVA_OPTS: "-Xmx512m -Xms512m"
+      discovery.type: single-node
+      ELASTIC_USERNAME: "${ELASTIC_USERNAME}"
+      ELASTIC_PASSWORD: "${ELASTIC_PASSWORD}"
+    ports:
+      - "${ELASTIC_PORT}:9200"
+      - "${ELASTIC_PORT_INTERNAL}:9300"
+    networks:
+      - essence_network
+
+  logstash:
+    image: logstash:7.17.4
+    container_name: logstash
+    volumes:
+      - ./logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
+      - ./logstash/pipeline/logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro
+    environment:
+      ELASTIC_USERNAME: "${ELASTIC_USERNAME}"
+      ELASTIC_PASSWORD: "${ELASTIC_PASSWORD}"
+    ports:
+      - "${LOGSTASH_PORT}:5555"
+      - "${LOGSTASH_PORT_INTERNAL}:9600"
+    depends_on:
+      - elasticsearch
+    networks:
+      - essence_network
+
+  kibana:
+    image: kibana:7.17.4
+    container_name: kibana
+    volumes:
+      - ./kibana/config/kibana.yml:/usr/share/kibana/config/kibana.yml:ro
+    environment:
+      ELASTIC_USERNAME: "${ELASTIC_USERNAME}"
+      ELASTIC_PASSWORD: "${ELASTIC_PASSWORD}"
+    ports:
+      - "${KIBANA_PORT}:5601"
+    depends_on:
+      - elasticsearch
+    networks:
+      - essence_network
+
+volumes:
+  essence_postgres_data:
+  elasticsearch_data:
+
+networks:
+  essence_network:
+    driver: bridge
