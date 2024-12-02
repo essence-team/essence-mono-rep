@@ -1,0 +1,9 @@
+[submodule "essence-bot"]
+	path = essence-bot
+	url = git@github.com:essence-team/essence-bot.git
+[submodule "backend"]
+	path = backend
+	url = git@github.com:essence-team/backend.git
+[submodule "smart-parser"]
+	path = smart-parser
+	url = git@github.com:essence-team/smart-parser.git
